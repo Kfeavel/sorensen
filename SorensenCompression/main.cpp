@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
+#include "Stopwatch.hpp"
 
 
 struct CompressionData
@@ -18,6 +19,14 @@ struct CompressionData
     uint64_t byteCountTotal;    // Total number of bytes
 };
 
+std::streamsize GetFileSizeFromStream(std::fstream& file)
+{
+    file.ignore(std::numeric_limits<std::streamsize>::max());
+    std::streamsize length = file.gcount();
+    file.clear(); // Since ignore will have set eof.
+    file.seekg(0, std::ios_base::beg);
+    return length;
+}
 
 int main(int argc, char* const argv[])
 {
@@ -26,12 +35,12 @@ int main(int argc, char* const argv[])
     
     int8_t opt = 0;
     bool doCompress = false;
-    while ((opt = getopt(argc, argv, "cui:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "cdi:o:")) != -1) {
         switch (opt) {
             case 'c':
                 doCompress = true;
                 break;
-            case 'u':
+            case 'd':
                 doCompress = false;
                 break;
             case 'i':
@@ -56,31 +65,47 @@ int main(int argc, char* const argv[])
     }
     
     if (doCompress) {
-        CompressionData data = {
-            .bitCountTotal = 0,
-            .byteCountTotal = 0,
-        };
-        
-        char byte;
-        while (fileIn.read(&byte, sizeof(byte)))
-        {
-            data.byteCountTotal++;
-            while (byte) {
-                if (byte % 2 == 1) {
-                    data.bitCountTotal++;
+        Stopwatch([&]() {
+            CompressionData data = {
+                .bitCountTotal = 0,
+                .byteCountTotal = 0,
+            };
+            
+            uint8_t byte;
+            while (fileIn.read(reinterpret_cast<char*>(&byte), sizeof(byte)))
+            {
+                data.byteCountTotal++;
+                while (byte) {
+                    if (byte % 2 == 1) {
+                        data.bitCountTotal++;
+                    }
+                    
+                    byte = byte >> 1;
                 }
-                
-                byte = byte >> 1;
             }
-        }
-        
-        std::cout << "Writing results..." << std::endl;
-        fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
+            
+            fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
+        });
     } else {
-        std::cout << "TODO: Decompression" << std::endl;
+        Stopwatch([&]() {
+            CompressionData data = {
+                .bitCountTotal = 0,
+                .byteCountTotal = 0,
+            };
+            
+            if (GetFileSizeFromStream(fileIn) != sizeof(data))
+            {
+                std::cout << "Compression data is corrupt";
+                exit(EXIT_FAILURE);
+            }
+            
+            // FIXME: How should I error check this?
+            fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
+            
+            std::cout << "TODO: Implement decompression" << std::endl;
+        });
     }
 
-    std::cout << "Done!" << std::endl;
     fileIn.close();
     fileOut.close();
     

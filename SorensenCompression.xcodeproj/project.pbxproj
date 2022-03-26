@@ -25,6 +25,7 @@
 /* Begin PBXFileReference section */
 		E9E25B6227EF7A0600825D5C /* SorensenCompression */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SorensenCompression; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9E25B6527EF7A0600825D5C /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		E9E25B6D27EF93EA00825D5C /* Stopwatch.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Stopwatch.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +58,7 @@
 		E9E25B6427EF7A0600825D5C /* SorensenCompression */ = {
 			isa = PBXGroup;
 			children = (
+				E9E25B6D27EF93EA00825D5C /* Stopwatch.hpp */,
 				E9E25B6527EF7A0600825D5C /* main.cpp */,
 			);
 			path = SorensenCompression;
