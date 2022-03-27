@@ -10,6 +10,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 #include <unistd.h>
 #include "Stopwatch.hpp"
 
@@ -21,7 +22,7 @@ struct CompressionData
     uint64_t hash;              // Hash of bitset
 };
 
-std::streamsize GetFileSizeFromStream(std::fstream& file)
+static std::streamsize GetFileSizeFromStream(std::fstream& file)
 {
     file.ignore(std::numeric_limits<std::streamsize>::max());
     std::streamsize length = file.gcount();
@@ -106,6 +107,7 @@ int main(int argc, char* const argv[])
             CompressionData data = {
                 .bitCountTotal = 0,
                 .byteCountTotal = 0,
+                .hash = 0,
             };
             
             if (GetFileSizeFromStream(fileIn) != sizeof(data))
@@ -117,7 +119,38 @@ int main(int argc, char* const argv[])
             // FIXME: How should I error check this?
             fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
             
-            bitset.reserve(data.byteCountTotal * CHAR_BIT);
+            for (size_t i = 0; i < (data.byteCountTotal * CHAR_BIT) - data.bitCountTotal; i++) {
+                bitset.push_back(0);
+            }
+            
+            for (size_t i = 0; i < data.bitCountTotal; i++) {
+                bitset.push_back(1);
+            }
+            
+            std::cout << "Decompressing... (This may take a while)" << std::endl;
+#if defined(DEBUG)
+            size_t iterations = 0;
+#endif
+            do {
+                size_t hash = std::hash<std::vector<bool>>{}(bitset);
+#if defined(DEBUG)
+                iterations++;
+                std::cout << "Hash: " << std::hex << std::uppercase << std::hash<std::vector<bool>>{}(bitset) << std::endl;
+                std::cout << "0b";
+                for (bool b : bitset) {
+                    std::cout << (b ? "1" : "0");
+                }
+                std::cout << std::endl;
+#endif
+                if (hash == data.hash)
+                {
+                    std::cout << "Got it!" << std::endl;
+                    break;
+                }
+            } while(std::next_permutation(bitset.begin(), bitset.end()));
+#if defined(DEBUG)
+            std::cout << "Iterations: " << std::dec << iterations << std::endl;
+#endif
         });
     }
 
