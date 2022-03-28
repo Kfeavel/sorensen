@@ -31,6 +31,22 @@ static std::streamsize GetFileSizeFromStream(std::fstream& file)
     return length;
 }
 
+static void binary_write(std::fstream& fout, std::vector<bool>* x)
+{
+    std::vector<bool>::size_type i = 0;
+    std::vector<bool>::size_type n = x->size();
+    while (i < n) {
+        uint8_t aggr = 0;
+        for (uint8_t mask = 1; mask > 0 && i < n; ++i, mask <<= 1) {
+            if (x->at(i)) {
+                aggr |= mask;
+            }
+        }
+        
+        fout.write(reinterpret_cast<const char*>(&aggr), sizeof(uint8_t));
+    }
+}
+
 int main(int argc, char* const argv[])
 {
     std::fstream fileIn;
@@ -67,7 +83,7 @@ int main(int argc, char* const argv[])
          }
     }
     
-    std::vector<bool> bitset;
+    std::vector<bool>* bitset = new std::vector<bool>;
     if (doCompress) {
         Stopwatch([&]() {
             CompressionData data = {
@@ -82,24 +98,14 @@ int main(int argc, char* const argv[])
                 data.byteCountTotal++;
                 for (uint8_t i = 0; i < CHAR_BIT; i++)
                 {
-                    bitset.push_back(((byte >> i) & 1) != 0);
+                    bitset->push_back(((byte >> i) & 1) != 0);
                     if (((byte >> i) & 1) != 0) {
                         data.bitCountTotal++;
                     }
                 }
             }
             
-            data.hash = std::hash<std::vector<bool>>{}(bitset);
-            
-#if defined(DEBUG)
-            std::cout << "Hash: " << std::hex << std::uppercase << data.hash << std::endl;
-            std::cout << "0b";
-            for (bool b : bitset) {
-                std::cout << (b ? "1" : "0");
-            }
-            std::cout << std::endl;
-#endif
-            
+            data.hash = std::hash<std::vector<bool>>{}(*bitset);
             fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
         });
     } else {
@@ -120,42 +126,29 @@ int main(int argc, char* const argv[])
             fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
             
             for (size_t i = 0; i < (data.byteCountTotal * CHAR_BIT) - data.bitCountTotal; i++) {
-                bitset.push_back(0);
+                bitset->push_back(0);
             }
             
             for (size_t i = 0; i < data.bitCountTotal; i++) {
-                bitset.push_back(1);
+                bitset->push_back(1);
             }
             
             std::cout << "Decompressing... (This may take a while)" << std::endl;
-#if defined(DEBUG)
-            size_t iterations = 0;
-#endif
             do {
-                size_t hash = std::hash<std::vector<bool>>{}(bitset);
-#if defined(DEBUG)
-                iterations++;
-                std::cout << "Hash: " << std::hex << std::uppercase << std::hash<std::vector<bool>>{}(bitset) << std::endl;
-                std::cout << "0b";
-                for (bool b : bitset) {
-                    std::cout << (b ? "1" : "0");
-                }
-                std::cout << std::endl;
-#endif
+                size_t hash = std::hash<std::vector<bool>>{}(*bitset);
                 if (hash == data.hash)
                 {
                     std::cout << "Got it!" << std::endl;
+                    binary_write(fileOut, bitset);
                     break;
                 }
-            } while(std::next_permutation(bitset.begin(), bitset.end()));
-#if defined(DEBUG)
-            std::cout << "Iterations: " << std::dec << iterations << std::endl;
-#endif
+            } while(std::next_permutation(bitset->begin(), bitset->end()));
         });
     }
 
     fileIn.close();
     fileOut.close();
+    delete bitset;
     
     return EXIT_SUCCESS;
 }
