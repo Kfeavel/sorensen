@@ -13,7 +13,6 @@
 #include <iostream>
 #include <algorithm>
 #include <unistd.h>
-#include "Stopwatch.hpp"
 
 
 struct CompressionData
@@ -32,12 +31,12 @@ static std::streamsize GetFileSizeFromStream(std::fstream& file)
     return length;
 }
 
-static void WriteVectorBool(std::fstream& fileOut, std::vector<bool>* x)
+static void WriteVectorBool(std::fstream& fileOut, std::vector<bool>& x)
 {
-    for (size_t i = 0; i < x->size(); i++) {
+    for (size_t i = 0; i < x.size(); i++) {
         uint8_t byte = 0;
         for (uint8_t mask = 1; mask > 0; mask <<= 1) {
-            if (x->at(i)) {
+            if (x.at(i)) {
                 byte |= mask;
             }
         }
@@ -46,9 +45,95 @@ static void WriteVectorBool(std::fstream& fileOut, std::vector<bool>* x)
     }
 }
 
+static void PrintElapsedTime(std::chrono::time_point<std::chrono::steady_clock>& start)
+{
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
+}
+
+static int Compress(std::fstream& fileIn, std::fstream& fileOut, CompressionData& data, std::vector<bool>& bitset)
+{
+    std::cout << "Compressing..." << std::endl;
+    uint8_t byte = 0;
+    while (fileIn.read(reinterpret_cast<char*>(&byte), sizeof(byte))) {
+        data.byteCountTotal++;
+        for (uint8_t i = 0; i < CHAR_BIT; i++) {
+            bitset.push_back(((byte >> i) & 1) != 0);
+            if (((byte >> i) & 1) != 0) {
+                data.setBitsCountTotal++;
+            }
+        }
+    }
+    
+    data.hash = std::hash<std::vector<bool>>{}(bitset);
+    fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
+    std::cout << "Done!" << std::endl;
+    return EXIT_SUCCESS;
+}
+
+static int Decompress(std::fstream& fileIn, std::fstream& fileOut, CompressionData& data, std::vector<bool>& bitset)
+{
+    // Get data about the resulting file before performing the decompression so that we can
+    // properly warn the end user that decompression may eat most of their RAM, and/or take
+    // a literal eternity to decompress. For this reason chickening out is the default answer.
+    
+    if (GetFileSizeFromStream(fileIn) != sizeof(data)) {
+        std::cout << "Compression data is corrupt";
+        return EXIT_FAILURE;
+    }
+    
+    fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
+    if (!fileIn.good()) {
+        std::cout << "Failed to read compression data";
+        return EXIT_FAILURE;
+    }
+    
+    double approximateSeconds = tgamma((data.setBitsCountTotal * 2) + 1) / pow(tgamma(data.setBitsCountTotal + 1), 2);
+    double approximateYears = approximateSeconds / (60.0f * 60.0f * 24.0f * 365.0f);
+    
+    std::cout << "Decompression requires " << data.byteCountTotal << " bytes of memory." << std::endl;
+    std::cout << "Approximate time to decompress: " << approximateYears << " year(s)" << std::endl;
+    std::cout << "Continue? [y/N] ";
+    if (std::tolower(std::getchar()) != 'y') {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Decompressing..." << std::endl;
+    // For `std::next_permutation` to work we need to fill in all of the zeros up front
+    // and then fill in the remaining ones at the end. From there, `std::next_permutation`
+    // will walk all possible iterations, effectively moving the ones from the last portion
+    // of the bitset to the front.
+    
+    for (size_t i = 0; i < (data.byteCountTotal * CHAR_BIT) - data.setBitsCountTotal; i++) {
+        bitset.push_back(0);
+    }
+    
+    for (size_t i = 0; i < data.setBitsCountTotal; i++) {
+        bitset.push_back(1);
+    }
+    
+    // Perform the actual decompression
+    uint64_t iterations = 0;
+    auto start = std::chrono::steady_clock::now();
+    do {
+        if (++iterations % UINT64_MAX == 0) {
+            std::cout << "Still working on it..." << std::endl;
+            PrintElapsedTime(start);
+        }
+        
+        size_t hash = std::hash<std::vector<bool>>{}(bitset);
+        if (hash == data.hash) {
+            std::cout << "Done!" << std::endl;
+            WriteVectorBool(fileOut, bitset);
+            break;
+        }
+    } while(std::next_permutation(bitset.begin(), bitset.end()));
+    
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char* const argv[])
 {
-    int ret = EXIT_SUCCESS;
     std::fstream fileIn;
     std::fstream fileOut;
     
@@ -83,95 +168,12 @@ int main(int argc, char* const argv[])
          }
     }
     
-    std::vector<bool>* bitset = new std::vector<bool>;
+    std::vector<bool> bitset;
     CompressionData data = {
         .setBitsCountTotal = 0,
         .byteCountTotal = 0,
         .hash = 0,
     };
     
-    if (doCompress) {
-        std::cout << "Compressing..." << std::endl;
-        Stopwatch([&]() {
-            uint8_t byte = 0;
-            while (fileIn.read(reinterpret_cast<char*>(&byte), sizeof(byte)))
-            {
-                data.byteCountTotal++;
-                for (uint8_t i = 0; i < CHAR_BIT; i++)
-                {
-                    bitset->push_back(((byte >> i) & 1) != 0);
-                    if (((byte >> i) & 1) != 0) {
-                        data.setBitsCountTotal++;
-                    }
-                }
-            }
-            
-            data.hash = std::hash<std::vector<bool>>{}(*bitset);
-            fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
-            std::cout << "Done!" << std::endl;
-        });
-    } else {
-        // Get data about the resulting file before performing the decompression so that we can
-        // properly warn the end user that decompression may eat most of their RAM, and/or take
-        // a literal eternity to decompress. For this reason chickening out is the default answer.
-        
-        if (GetFileSizeFromStream(fileIn) != sizeof(data))
-        {
-            std::cout << "Compression data is corrupt";
-            ret = EXIT_FAILURE;
-            goto fail;
-        }
-        
-        fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
-        if (!fileIn.good()) {
-            std::cout << "Failed to read compression data";
-            ret = EXIT_FAILURE;
-            goto fail;
-        }
-        
-        // TODO: Not quite accurate yet. Need time for 6 bytes to get better equation.
-        double approximateSeconds = (45.576 * std::pow(data.byteCountTotal, 2)) - (209.28 * data.byteCountTotal) + 190.95;
-        
-        std::cout << "Decompression requires " << data.byteCountTotal << " bytes of memory." << std::endl;
-        std::cout << "Approximate time to decompress: " << approximateSeconds << " seconds" << std::endl;
-        std::cout << "Continue? [y/N] ";
-        if (std::tolower(std::getchar()) != 'y') {
-            ret = EXIT_FAILURE;
-            goto fail;
-        }
-        
-        std::cout << "Decompressing..." << std::endl;
-        Stopwatch([&]() {
-            // For `std::next_permutation` to work we need to fill in all of the zeros up front
-            // and then fill in the remaining ones at the end. From there, `std::next_permutation`
-            // will walk all possible iterations, effectively moving the ones from the last portion
-            // of the bitset to the front.
-            
-            for (size_t i = 0; i < (data.byteCountTotal * CHAR_BIT) - data.setBitsCountTotal; i++) {
-                bitset->push_back(0);
-            }
-            
-            for (size_t i = 0; i < data.setBitsCountTotal; i++) {
-                bitset->push_back(1);
-            }
-            
-            // Perform the actual decompression
-            do {
-                size_t hash = std::hash<std::vector<bool>>{}(*bitset);
-                if (hash == data.hash)
-                {
-                    std::cout << "Done!" << std::endl;
-                    WriteVectorBool(fileOut, bitset);
-                    break;
-                }
-            } while(std::next_permutation(bitset->begin(), bitset->end()));
-        });
-    }
-
-fail:
-    fileIn.close();
-    fileOut.close();
-    delete bitset;
-    
-    return ret;
+    return (doCompress ? Compress(fileIn, fileOut, data, bitset) : Decompress(fileIn, fileOut, data, bitset));
 }
