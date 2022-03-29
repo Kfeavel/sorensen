@@ -20,3 +20,16 @@ how much time it takes to decompress a zipped file.
 If a more precise measure of how long Sorensen Compression takes is desired, the Big-O notation for the decompression
 algorithm is \
 **O( (2n)! / (n!)^2 )**.
+
+## Limitations
+
+The biggest limitation is that most people don't live past the age of 90 years. So, don't compress anything larger than
+17 bits and it'll be done within the next 74 years. Compress 18 bits and it'll take about 287 years. So maybe the decompression
+will be done in time for your great, great, grandchildren to appreciate the contents of the original file by the time they're 70. :)
+
+## How can I help?
+
+You can't. Nothing short of a miracle will save this algorithm. Unless you're capable of doing literal digital magic
+or some sort of incantation, there's not much that will save this program from being awful.
+
+This code is so bad that has been made illegal in at least 13 countries and banned from discussion within the scientific community.
