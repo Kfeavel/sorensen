@@ -18,6 +18,5 @@ As such, it seems like a fair tradeoff that all of the space and information sav
 how much time it takes to decompress a zipped file.
 
 If a more precise measure of how long Sorensen Compression takes is desired, the Big-O notation for the decompression
-algorithm is as follows:
-
-![BigO](https://latex.codecogs.com/svg.image?O(\frac{(2n)!}{(n!)^2}))
+algorithm is \
+**O( (2n)! / (n!)^2 )**.
