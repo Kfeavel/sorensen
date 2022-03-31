@@ -8,8 +8,10 @@ original file, Sorensen Compression is able to save you precious storage space.
 
 ## How it works
 
-What is a file? Nothing more than a pile of bits. By recording how many bits the original file contained
-(the file size, `N`), how many of those bits were set to `1`, and a hash, we're able to recreate any file of any
+[![What is a file?](.github/what-is-a-file.png?raw=true "What is a file? A miserable pile of bits.")](https://knowyourmeme.com/memes/what-is-a-man)
+
+What is a file? A miserable pile of bits. That fact is the foundation of Sorensen compression. By recording how many bits the original
+file contained (the file size, `N`), how many of those bits were set to `1`, and a hash, we're able to recreate any file of any
 size using only this information by walking every permutation of `1`s and `0`s for `N` bits.
 
 Explain it like I'm 5: It's like we're mining Bitcoin, but instead of causing global warming to earn "money" we
