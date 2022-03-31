@@ -33,13 +33,13 @@ The biggest limitation is that most people don't live past the age of 90 years. 
 17 bits and it'll be done within the next 74 years. Compress 18 bits and it'll take about 287 years. So maybe the decompression
 will be done in time for your great, great, grandchildren to appreciate the contents of the original file by the time they're 70. :)
 
-Moore's Law states that the number of transistors in a CPU will double rougly every 2 years. This means that computers in the future
+Moore's Law states that the number of transistors in a CPU will double roughly every 2 years. This means that computers in the future
 will be more powerful and will be able to decompress Sorensen-compressed files that much quicker. That doesn't help you now, but at
 least you can sleep well knowing that sometime in the future, someone will eventually be able to decompress your file at a faster
 rate than you can. Maybe quantum computing can help save your photo album after you accidentally compressed that folder.
 
 There's also currently no way to save the state of recovery. If you're 5 minutes shy of running this for 74 years and you lose power,
-whether its rolling blackouts because the sun is going dark or your great-grandchild innocently poking the power button, you're gonna
+whether it's rolling blackouts because the sun is going dark or your great-grandchild innocently poking the power button, you're gonna
 have a bad time.
 
 ## How can I help?
@@ -49,7 +49,7 @@ or some sort of incantation, there's not much that will save this algorithm from
 
 This code is so bad that has been made illegal in at least 13 countries and banned from discussion within the scientific community.
 
-## Testamonials
+## Testimonials
 > "Sorensen is as Sorensen does." - Mama
 
 > "Your scientists were so preoccupied with whether or not they could, they didn’t stop to think if they should." - Dr. Ian Malcom
