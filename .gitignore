@@ -5,3 +5,9 @@ xcshareddata/
 ## Xcode 8 and earlier
 *.xcscmblueprint
 *.xccheckout
+
+# Build output
+sorensen
+
+# Test data
+data.*
