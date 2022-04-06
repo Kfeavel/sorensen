@@ -41,15 +41,17 @@ static std::streamsize GetFileSizeFromStream(std::fstream& file)
 
 static void WriteVectorBool(std::fstream& fileOut, std::vector<bool>& x)
 {
-    for (size_t i = 0; i < x.size(); i++) {
-        uint8_t byte = 0;
-        for (uint8_t mask = 1; mask > 0; mask <<= 1) {
+    std::vector<bool>::size_type i = 0;
+    std::vector<bool>::size_type n = x.size();
+    while (i < n) {
+        uint8_t aggr = 0;
+        for (uint8_t mask = 1; mask > 0 && i < n; ++i, mask <<= 1) {
             if (x.at(i)) {
-                byte |= mask;
+                aggr |= mask;
             }
         }
 
-        fileOut.write(reinterpret_cast<const char*>(&byte), sizeof(uint8_t));
+        fileOut.write(reinterpret_cast<const char*>(&aggr), sizeof(uint8_t));
     }
 }
 
