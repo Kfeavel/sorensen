@@ -15,6 +15,7 @@
 #include <iostream>
 #include <algorithm>
 #include <unistd.h>
+#include "Benchmark.hpp"
 
 
 enum Mode {
@@ -196,10 +197,14 @@ int main(int argc, char* const argv[])
     switch (mode)
     {
         case COMPRESS:
-            err = Compress(fileIn, fileOut, data, bitset);
+            Benchmark([&] {
+                err = Compress(fileIn, fileOut, data, bitset);
+            });
             break;
         case DECOMPRESS:
-            err = Decompress(fileIn, fileOut, data, bitset);
+            Benchmark([&] {
+                err = Decompress(fileIn, fileOut, data, bitset);
+            });
             break;
         default:
             Usage(argv);
