@@ -9,11 +9,19 @@
 #include <vector>
 #include <bitset>
 #include <string>
+#include <chrono>
+#include <climits>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
 #include <unistd.h>
 
+
+enum Mode {
+    INVALID,
+    COMPRESS,
+    DECOMPRESS,
+};
 
 struct CompressionData
 {
@@ -40,7 +48,7 @@ static void WriteVectorBool(std::fstream& fileOut, std::vector<bool>& x)
                 byte |= mask;
             }
         }
-        
+
         fileOut.write(reinterpret_cast<const char*>(&byte), sizeof(uint8_t));
     }
 }
@@ -64,7 +72,7 @@ static int Compress(std::fstream& fileIn, std::fstream& fileOut, CompressionData
             }
         }
     }
-    
+
     data.hash = std::hash<std::vector<bool>>{}(bitset);
     fileOut.write(reinterpret_cast<const char*>(&data), sizeof(data));
     std::cout << "Done!" << std::endl;
@@ -76,42 +84,42 @@ static int Decompress(std::fstream& fileIn, std::fstream& fileOut, CompressionDa
     // Get data about the resulting file before performing the decompression so that we can
     // properly warn the end user that decompression may eat most of their RAM, and/or take
     // a literal eternity to decompress. For this reason chickening out is the default answer.
-    
+
     if (GetFileSizeFromStream(fileIn) != sizeof(data)) {
         std::cout << "Compression data is corrupt";
         return EXIT_FAILURE;
     }
-    
+
     fileIn.read(reinterpret_cast<char*>(&data), sizeof(data));
     if (!fileIn.good()) {
         std::cout << "Failed to read compression data";
         return EXIT_FAILURE;
     }
-    
+
     double approximateSeconds = tgamma((data.setBitsCountTotal * 2) + 1) / pow(tgamma(data.setBitsCountTotal + 1), 2);
     double approximateYears = approximateSeconds / (60.0f * 60.0f * 24.0f * 365.0f);
-    
+
     std::cout << "Decompression requires " << data.byteCountTotal << " bytes of memory." << std::endl;
     std::cout << "Approximate time to decompress: " << approximateYears << " year(s)" << std::endl;
     std::cout << "Continue? [y/N] ";
     if (std::tolower(std::getchar()) != 'y') {
         return EXIT_FAILURE;
     }
-    
+
     std::cout << "Decompressing..." << std::endl;
     // For `std::next_permutation` to work we need to fill in all of the zeros up front
     // and then fill in the remaining ones at the end. From there, `std::next_permutation`
     // will walk all possible iterations, effectively moving the ones from the last portion
     // of the bitset to the front.
-    
+
     for (size_t i = 0; i < (data.byteCountTotal * CHAR_BIT) - data.setBitsCountTotal; i++) {
         bitset.push_back(0);
     }
-    
+
     for (size_t i = 0; i < data.setBitsCountTotal; i++) {
         bitset.push_back(1);
     }
-    
+
     // Perform the actual decompression
     uint64_t iterations = 0;
     auto start = std::chrono::steady_clock::now();
@@ -120,7 +128,7 @@ static int Decompress(std::fstream& fileIn, std::fstream& fileOut, CompressionDa
             std::cout << "Still working on it..." << std::endl;
             PrintElapsedTime(start);
         }
-        
+
         size_t hash = std::hash<std::vector<bool>>{}(bitset);
         if (hash == data.hash) {
             std::cout << "Done!" << std::endl;
@@ -128,52 +136,73 @@ static int Decompress(std::fstream& fileIn, std::fstream& fileOut, CompressionDa
             break;
         }
     } while(std::next_permutation(bitset.begin(), bitset.end()));
-    
+
     return EXIT_SUCCESS;
+}
+
+void Usage(char* const argv[]) {
+    std::cout
+        << "Usage: " << argv[0] << " action input output" << std::endl
+        << "action\tMust be either `compress` or `decompress`" << std::endl
+        << "input\tInput file path" << std::endl
+        << "output\tOutput file path" << std::endl;
 }
 
 int main(int argc, char* const argv[])
 {
-    std::fstream fileIn;
-    std::fstream fileOut;
-    
-    int8_t opt = 0;
-    bool doCompress = false;
-    while ((opt = getopt(argc, argv, "cdi:o:")) != -1) {
-        switch (opt) {
-            case 'c':
-                doCompress = true;
-                break;
-            case 'd':
-                doCompress = false;
-                break;
-            case 'i':
-                fileIn.open(optarg, std::fstream::in | std::fstream::binary);
-                if (!fileIn.is_open() || !fileIn.good()) {
-                    std::cout << "Failed to open input file" << std::endl;
-                    return EXIT_FAILURE;
-                }
-                break;
-            case 'o':
-                fileOut.open(optarg, std::fstream::out | std::fstream::binary);
-                if (!fileOut.is_open() || !fileOut.good()) {
-                    std::cout << "Failed to open output file" << std::endl;
-                    return EXIT_FAILURE;
-                }
-                break;
-            case 'h':
-            default:
-                std::cout << "TODO: Usage" << std::endl;
-                return EXIT_SUCCESS;
-         }
+    if (argc != 4) {
+        Usage(argv);
+        return EXIT_FAILURE;
     }
-    
+
+    // argv[1] is always mode
+    Mode mode = INVALID;
+    std::string argMode = argv[1];
+    if (argMode == "compress") {
+        mode = COMPRESS;
+    } else if (argMode == "decompress") {
+        mode = DECOMPRESS;
+    } else {
+        Usage(argv);
+        return EXIT_FAILURE;
+    }
+
+    // argv[2] is always input
+    std::fstream fileIn;
+    fileIn.open(argv[2], std::fstream::in | std::fstream::binary);
+    if (!fileIn.is_open() || !fileIn.good()) {
+        std::cout << "Failed to open input file" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // argv[3] is always output
+    std::fstream fileOut;
+    fileOut.open(argv[3], std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    if (!fileOut.is_open() || !fileOut.good()) {
+        std::cout << "Failed to open output file" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     std::vector<bool> bitset;
     CompressionData data = {
         .setBitsCountTotal = 0,
         .byteCountTotal = 0,
         .hash = 0,
     };
-    
-    return (doCompress ? Compress(fileIn, fileOut, data, bitset) : Decompress(fileIn, fileOut, data, bitset));
+
+    int err = EXIT_FAILURE;
+    switch (mode)
+    {
+        case COMPRESS:
+            err = Compress(fileIn, fileOut, data, bitset);
+            break;
+        case DECOMPRESS:
+            err = Decompress(fileIn, fileOut, data, bitset);
+            break;
+        default:
+            Usage(argv);
+            break;
+    }
+
+    return err;
 }
